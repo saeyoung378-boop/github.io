@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>별의 연주시차 게임</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  font-family: Arial, "Noto Sans KR", sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+  position: relative;
+  overflow-x: hidden;
+}
+
+h1 {
+  margin: 5px 0 12px;
+  color: #38bdf8;
+}
+
+#info {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.game-container {
+  position: relative;
+  display: inline-block;
+}
+
+canvas {
+  width: 800px;
+  max-width: 100%;
+  height: auto;
+  border: 3px solid #334155;
+  border-radius: 12px;
+  background: #020617;
+  touch-action: none;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  margin: 10px 6px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#restart {
+  background: #2563eb;
+  color: white;
+}
+
+#restart:hover {
+  background: #1d4ed8;
+}
+
+/* 바깥쪽 귀여운 우주 배경 아이콘 */
+.space-decoration {
+  position: absolute;
+  font-size: 45px;
+  user-select: none;
+  pointer-events: none;
+  animation: float 4s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  100% { transform: translateY(-15px) rotate(10deg); }
+}
+
+.deco1 { top: 30px; left: calc(50% - 480px); animation-delay: 0s; }
+.deco2 { top: 220px; left: calc(50% - 500px); animation-delay: 1s; }
+.deco3 { top: 430px; left: calc(50% - 470px); animation-delay: 2s; }
+.deco4 { top: 40px; right: calc(50% - 480px); animation-delay: 0.5s; }
+.deco5 { top: 240px; right: calc(50% - 510px); animation-delay: 1.5s; }
+.deco6 { top: 450px; right: calc(50% - 470px); animation-delay: 2.5s; }
+
+/* 문제창 */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  z-index: 500;
+}
+
+.question-box {
+  background: #1e293b;
+  color: #f8fafc;
+  width: 500px;
+  max-width: 100%;
+  padding: 24px;
+  border-radius: 16px;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+.question-box h2 {
+  margin-top: 0;
+  color: #facc15;
+}
+
+.choice {
+  display: block;
+  width: 100%;
+  margin: 9px 0;
+  padding: 12px;
+  text-align: left;
+  background: #334155;
+  color: #f8fafc;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: background 0.2s;
+}
+
+.choice:hover {
+  background: #0284c7;
+}
+
+/* 해골 효과 */
+#skullEffect {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#dancingSkull {
+  font-size: 120px;
+  animation: skullDance 0.2s infinite alternate;
+}
+
+@keyframes skullDance {
+  0% { transform: rotate(-20deg) translateY(0); }
+  50% { transform: rotate(20deg) translateY(-25px); }
+  100% { transform: rotate(-20deg) translateY(0); }
+}
+</style>
+</head>
+
+<body>
+
+<!-- 우주 배경 장식 아이콘 -->
+<div class="space-decoration deco1">🪐</div>
+<div class="space-decoration deco2">🛸</div>
+<div class="space-decoration deco3">🌌</div>
+<div class="space-decoration deco4">🚀</div>
+<div class="space-decoration deco5">🛰️</div>
+<div class="space-decoration deco6">☄️</div>
+
+<h1>🌟 별의 연주시차 게임</h1>
+
+<div id="info">
+  <span>점수: <b id="score" style="color:#facc15;">0</b></span>
+  <span>목숨: <b id="lives" style="color:#ef4444;">3</b></span>
+  <span>깨트린 남은 벽돌: <b id="bricksLeft" style="color:#38bdf8;">33</b></span>
+</div>
+
+<div class="game-container">
+  <canvas id="game" width="800" height="560"></canvas>
+</div>
+
+<br>
+
+<button id="restart" onclick="restartGame()">다시 시작</button>
+
+<p style="color: #94a3b8;">
+  ← → 방향키 또는 마우스로 아래쪽 바를 움직이세요.<br>
+  공이 아래쪽 바에 닿으면 연주시차 문제가 나옵니다.
+</p>
+
+<!-- 문제창 -->
+<div class="modal" id="questionModal">
+  <div class="question-box">
+    <h2>🔭 별 관측 문제</h2>
+    <p id="questionText" style="font-size: 17px; line-height: 1.5;"></p>
+    <div id="choices"></div>
+  </div>
+</div>
+
+<!-- 목숨 감소 해골 효과 -->
+<div id="skullEffect">
+  <div id="dancingSkull">💀</div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const W = canvas.width;
+const H = canvas.height;
+
+let score = 0;
+let lives = 3;
+
+let running = true;
+let questionOpen = false;
+
+// 게임 일시 정지 여부
+let gamePaused = false;
+
+// 정답 맞힌 후 가속 타겟 상태
+let targetBrick = null;
+
+// 해골 효과 중복 실행 방지
+let lifeEffectRunning = false;
+
+const paddle = {
+  x: 335,
+  y: 510,
+  w: 130,
+  h: 16,
+  speed: 8
+};
+
+const ball = {
+  x: 400,
+  y: 450,
+  r: 9,
+  vx: 3.2,
+  vy: -4.5,
+  baseSpeed: 5.5
+};
+
+// 위쪽 바 (천장)
+const ceiling = {
+  x: 0,
+  y: 0,
+  w: W,
+  h: 10
+};
+
+// 상단 큰 별 3개 (개당 100점)
+let bigStars = [];
+// 사각형 별 벽돌 30개 (가로 10 x 세로 3, 개당 30점)
+let bricks = [];
+
+function initBricksAndStars() {
+  bigStars = [];
+  bricks = [];
+
+  // 1. 큰 별 3개
+  const bigStarPositions = [200, 400, 600];
+  bigStarPositions.forEach((cx) => {
+    bigStars.push({
+      x: cx,
+      y: 45,
+      r: 22,
+      alive: true,
+      score: 100
+    });
+  });
+
+  // 2. 사각형 벽돌 (가로 10개, 세로 3개)
+  const cols = 10;
+  const rows = 3;
+  const brickWidth = 72;
+  const brickHeight = 28;
+  const padding = 6;
+  const offsetTop = 90;
+  const offsetLeft = 11;
+
+  const colors = ["#ef4444", "#f59e0b", "#10b981"];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const bx = offsetLeft + c * (brickWidth + padding);
+      const by = offsetTop + r * (brickHeight + padding);
+      bricks.push({
+        x: bx,
+        y: by,
+        w: brickWidth,
+        h: brickHeight,
+        color: colors[r % colors.length],
+        alive: true,
+        score: 30
+      });
+    }
+  }
+}
+
+// 문제 목록 (총 22문제)
+const questions = [
+  {
+    text: "지구에서 6개월 간격으로 별을 관측했을 때 보이는 각도(시차)의 1/2을 무엇이라 하는가?",
+    choices: ["연주시차", "일주시차", "시직경", "광년"],
+    answer: "연주시차"
+  },
+  {
+    text: "별의 연주시차가 발생하는 근본적인 원인은 무엇인가?",
+    choices: ["지구의 공전", "지구의 자전", "별의 자전", "태양의 공전"],
+    answer: "지구의 공전"
+  },
+  {
+    text: "연주시차가 1초(1″)인 별까지의 거리를 나타내는 단위는 무엇인가?",
+    choices: ["1 파섹(pc)", "1 광년(ly)", "1 천문단위(AU)", "1 킬로미터(km)"],
+    answer: "1 파섹(pc)"
+  },
+  {
+    text: "지구에서 관측한 6개월 동안의 최대 이동 각도가 0.8초일 때, 이 별의 연주시차는?",
+    choices: ["0.4초", "0.8초", "1.6초", "0.2초"],
+    answer: "0.4초"
+  },
+  {
+    text: "별의 거리(d)와 연주시차(p)의 관계를 올바르게 나타낸 식은?",
+    choices: ["d(pc) = 1 / p(″)", "d(pc) = p(″)", "d(pc) = 1 + p(″)", "d(pc) = p(″) / 2"],
+    answer: "d(pc) = 1 / p(″)"
+  },
+  {
+    text: "연주시차와 별까지의 거리는 어떤 관계인가?",
+    choices: ["반비례 관계", "정비례 관계", "제곱 비례 관계", "아무 관계 없음"],
+    answer: "반비례 관계"
+  },
+  {
+    text: "지구에서 매우 먼 거리(약 100pc 이상)에 있는 별은 연주시차를 측정하기 어렵다. 그 이유는?",
+    choices: ["연주시차가 너무 작아지기 때문에", "연주시차가 너무 커지기 때문에", "별이 너무 밝아지기 때문에", "지구 공전이 멈추기 때문에"],
+    answer: "연주시차가 너무 작아지기 때문에"
+  },
+  {
+    text: "별까지의 거리가 멀어질수록 연주시차의 크기는 어떻게 되는가?",
+    choices: ["작아진다", "커진다", "변함없다", "0.5초로 일정하다"],
+    answer: "작아진다"
+  },
+  {
+    text: "1파섹(pc)은 약 몇 광년(ly)에 해당하는가?",
+    choices: ["약 3.26 광년", "약 1.0 광년", "약 10 광년", "약 300 광년"],
+    answer: "약 3.26 광년"
+  },
+  {
+    text: "연주시차가 0.5초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["2 파섹", "0.5 파섹", "1 파섹", "5 파섹"],
+    answer: "2 파섹"
+  },
+  {
+    text: "연주시차가 0.25초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["4 파섹", "0.25 파섹", "2 파섹", "8 파섹"],
+    answer: "4 파섹"
+  },
+  {
+    text: "연주시차가 0.2초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["5 파섹", "2 파섹", "0.2 파섹", "10 파섹"],
+    answer: "5 파섹"
+  },
+  {
+    text: "연주시차가 0.1초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["10 파섹", "1 파섹", "5 파섹", "100 파섹"],
+    answer: "10 파섹"
+  },
+  {
+    text: "연주시차가 0.05초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["20 파섹", "5 파섹", "10 파섹", "50 파섹"],
+    answer: "20 파섹"
+  },
+  {
+    text: "연주시차가 0.02초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["50 파섹", "20 파섹", "100 파섹", "2 파섹"],
+    answer: "50 파섹"
+  },
+  {
+    text: "연주시차가 0.01초(″)인 별까지의 거리는 몇 파섹인가?",
+    choices: ["100 파섹", "10 파섹", "50 파섹", "1000 파섹"],
+    answer: "100 파섹"
+  },
+  {
+    text: "지구로부터 거리가 5파섹(pc)인 별의 연주시차는 얼마인가?",
+    choices: ["0.2초", "0.5초", "0.1초", "2초"],
+    answer: "0.2초"
+  },
+  {
+    text: "지구로부터 거리가 10파섹(pc)인 별의 연주시차는 얼마인가?",
+    choices: ["0.1초", "0.2초", "1초", "0.01초"],
+    answer: "0.1초"
+  },
+  {
+    text: "지구로부터 거리가 20파섹(pc)인 별의 연주시차는 얼마인가?",
+    choices: ["0.05초", "0.2초", "0.5초", "0.02초"],
+    answer: "0.05초"
+  },
+  {
+    text: "별 A의 거리가 2pc, 별 B의 거리가 8pc일 때 연주시차가 더 큰 별은?",
+    choices: ["별 A", "별 B", "두 별이 같다", "알 수 없다"],
+    answer: "별 A"
+  },
+  {
+    text: "별 A의 연주시차가 0.4초, 별 B의 연주시차가 0.1초일 때, 별 B는 별 A보다 몇 배 더 멀리 있는가?",
+    choices: ["4배", "2배", "8배", "0.25배"],
+    answer: "4배"
+  },
+  {
+    text: "어떤 별까지의 거리가 10광년이다. 별빛이 지구까지 오는 데 걸리는 시간은?",
+    choices: ["10년", "5년", "20년", "100년"],
+    answer: "10년"
+  }
+];
+
+function updateInfo() {
+  document.getElementById("score").textContent = score;
+  document.getElementById("lives").textContent = lives;
+  
+  const remaining = bigStars.filter(s => s.alive).length + bricks.filter(b => b.alive).length;
+  document.getElementById("bricksLeft").textContent = remaining;
+
+  if (remaining === 0 && running) {
+    running = false;
+    setTimeout(() => {
+      alert("🎉 축하합니다! 모든 별과 벽돌을 다 깼습니다!\n최종 점수: " + score + "점");
+    }, 100);
+  }
+}
+
+// 별 그리기 함수
+function drawStar(x, y, r, fillColor = "#facc15", strokeColor = "#fde68a") {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = -Math.PI / 2 + i * Math.PI / 5;
+    const radius = i % 2 === 0 ? r : r * 0.45;
+    const px = Math.cos(angle) * radius;
+    const py = Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 화면 그리기
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 배경 별
+  ctx.fillStyle = "#475569";
+  for (let i = 0; i < 45; i++) {
+    const x = (i * 137) % W;
+    const y = (i * 83) % H;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 1. 상단 큰 별 3개 그리기 (100점)
+  bigStars.forEach(s => {
+    if (s.alive) {
+      drawStar(s.x, s.y, s.r, "#facc15", "#ffffff");
+    }
+  });
+
+  // 2. 사각형 별 벽돌 30개 그리기 (30점)
+  bricks.forEach(b => {
+    if (b.alive) {
+      // 벽돌 배경
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, b.w, b.h, 6);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 벽돌 중앙 미니 별
+      drawStar(b.x + b.w / 2, b.y + b.h / 2, 8, "#fef08a", "#ffffff");
+    }
+  });
+
+  // 공 그리기
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fillStyle = "#38bdf8";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 아래쪽 패들(바) 그리기
+  ctx.fillStyle = "#60a5fa";
+  ctx.beginPath();
+  ctx.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#93c5fd";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+// 공 초기화
+function resetBall(direction = -1) {
+  ball.x = 400;
+  ball.y = 450;
+
+  ball.baseSpeed = 5.5;
+  const angle = (Math.random() * 0.6 - 0.3) * Math.PI;
+  ball.vx = ball.baseSpeed * Math.sin(angle) || 2.5;
+  ball.vy = direction * Math.abs(ball.baseSpeed * Math.cos(angle));
+
+  targetBrick = null;
+}
+
+// 공 속도 증가 처리 (벽돌 깨질 때마다 +3% 가속)
+function accelerateBall() {
+  ball.baseSpeed *= 1.03;
+  const currentSpeed = Math.hypot(ball.vx, ball.vy);
+  if (currentSpeed > 0) {
+    ball.vx = (ball.vx / currentSpeed) * ball.baseSpeed;
+    ball.vy = (ball.vy / currentSpeed) * ball.baseSpeed;
+  }
+}
+
+// 아래쪽 바 이동
+function movePaddle(dx) {
+  paddle.x += dx;
+  paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+}
+
+// 조작 이벤트
+document.addEventListener("keydown", function(event) {
+  if (event.key === "ArrowLeft") movePaddle(-paddle.speed);
+  if (event.key === "ArrowRight") movePaddle(paddle.speed);
+});
+
+canvas.addEventListener("mousemove", function(event) {
+  const rect = canvas.getBoundingClientRect();
+  paddle.x = (event.clientX - rect.left) * (W / rect.width) - paddle.w / 2;
+  paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+});
+
+canvas.addEventListener("touchmove", function(event) {
+  const touch = event.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  paddle.x = (touch.clientX - rect.left) * (W / rect.width) - paddle.w / 2;
+  paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+  event.preventDefault();
+}, { passive: false });
+
+// 문제 출제
+function showQuestion() {
+  const question = questions[Math.floor(Math.random() * questions.length)];
+
+  document.getElementById("questionText").textContent = question.text;
+  const choicesBox = document.getElementById("choices");
+  choicesBox.innerHTML = "";
+
+  const shuffledChoices = [...question.choices].sort(() => Math.random() - 0.5);
+
+  shuffledChoices.forEach(function(choice) {
+    const button = document.createElement("button");
+    button.className = "choice";
+    button.textContent = choice;
+    button.onclick = function() {
+      answerQuestion(choice, question.answer);
+    };
+    choicesBox.appendChild(button);
+  });
+
+  questionOpen = true;
+  document.getElementById("questionModal").style.display = "flex";
+}
+
+// 목숨 감소 + 해골 효과
+function loseLife(callback) {
+  if (lifeEffectRunning || !running) return;
+
+  lifeEffectRunning = true;
+  lives--;
+  updateInfo();
+  gamePaused = true;
+
+  const skull = document.getElementById("skullEffect");
+  skull.style.display = "flex";
+
+  setTimeout(function() {
+    skull.style.display = "none";
+    lifeEffectRunning = false;
+
+    if (lives <= 0) {
+      running = false;
+      gamePaused = true;
+      alert("게임 오버! 다시 시작 버튼을 눌러 주세요.");
+      return;
+    }
+
+    gamePaused = false;
+    if (callback) callback();
+  }, 1000);
+}
+
+// 정답 처리
+function answerQuestion(selected, answer) {
+  if (!questionOpen || gamePaused) return;
+
+  questionOpen = false;
+  document.getElementById("questionModal").style.display = "none";
+
+  if (selected === answer) {
+    score += 20;
+    updateInfo();
+  } else {
+    loseLife();
+  }
+}
+
+// 벽돌 및 공 충돌 모듈
+function checkCollisions() {
+  // 1. 천장 충돌
+  if (ball.vy < 0 && ball.y - ball.r <= ceiling.y + ceiling.h) {
+    ball.y = ceiling.y + ceiling.h + ball.r;
+    ball.vy = Math.abs(ball.vy);
+  }
+
+  // 2. 상단 큰 별 (100점) 충돌 검사
+  bigStars.forEach(s => {
+    if (s.alive) {
+      const dist = Math.hypot(ball.x - s.x, ball.y - s.y);
+      if (dist <= ball.r + s.r) {
+        s.alive = false;
+        score += s.score;
+        ball.vy *= -1;
+        accelerateBall(); // 깨질 때마다 공 속도 증가
+        updateInfo();
+      }
+    }
+  });
+
+  // 3. 일반 별 벽돌 (30점) 충돌 검사
+  bricks.forEach(b => {
+    if (b.alive) {
+      if (
+        ball.x + ball.r > b.x &&
+        ball.x - ball.r < b.x + b.w &&
+        ball.y + ball.r > b.y &&
+        ball.y - ball.r < b.y + b.h
+      ) {
+        b.alive = false;
+        score += b.score;
+
+        // 반사 방향 계산
+        const overlapLeft = (ball.x + ball.r) - b.x;
+        const overlapRight = (b.x + b.w) - (ball.x - ball.r);
+        const overlapTop = (ball.y + ball.r) - b.y;
+        const overlapBottom = (b.y + b.h) - (ball.y - ball.r);
+
+        const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+        if (minOverlap === overlapLeft || minOverlap === overlapRight) {
+          ball.vx *= -1;
+        } else {
+          ball.vy *= -1;
+        }
+
+        accelerateBall(); // 깨질 때마다 공 속도 증가
+        updateInfo();
+      }
+    }
+  });
+}
+
+// 게임 상태 업데이트
+function update() {
+  if (!running || questionOpen || gamePaused) return;
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // 좌우 벽 충돌
+  if (ball.x - ball.r <= 0 || ball.x + ball.r >= W) {
+    ball.vx *= -1;
+    ball.x = Math.max(ball.r, Math.min(W - ball.r, ball.x));
+  }
+
+  // 벽돌/별 충돌 체크
+  checkCollisions();
+
+  // 아래쪽 바(패들) 충돌 -> 문제 출제
+  if (
+    ball.vy > 0 &&
+    ball.y + ball.r >= paddle.y &&
+    ball.y - ball.r <= paddle.y + paddle.h &&
+    ball.x >= paddle.x &&
+    ball.x <= paddle.x + paddle.w
+  ) {
+    ball.y = paddle.y - ball.r;
+
+    // 패들 맞은 위치에 따른 반사각 조정
+    const hitPos = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+    const angle = hitPos * (Math.PI / 3); // 최대 60도 꺾임
+
+    ball.vx = ball.baseSpeed * Math.sin(angle);
+    ball.vy = -ball.baseSpeed * Math.cos(angle);
+
+    showQuestion();
+    return;
+  }
+
+  // 공을 놓쳤을 때
+  if (ball.y - ball.r > H) {
+    loseLife(function() {
+      resetBall(-1);
+    });
+  }
+}
+
+// 다시 시작
+function restartGame() {
+  score = 0;
+  lives = 3;
+
+  running = true;
+  questionOpen = false;
+  gamePaused = false;
+  lifeEffectRunning = false;
+
+  paddle.x = 335;
+
+  initBricksAndStars();
+  resetBall(-1);
+  updateInfo();
+
+  document.getElementById("questionModal").style.display = "none";
+  document.getElementById("skullEffect").style.display = "none";
+}
+
+// 초기화 실행
+initBricksAndStars();
+updateInfo();
+resetBall(-1);
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
